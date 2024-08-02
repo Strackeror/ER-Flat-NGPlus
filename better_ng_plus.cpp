@@ -1,13 +1,18 @@
-#define TOML_EXCEPTIONS 0
-
+#include "deps/from/modutils.hpp"
 #include <Windows.h>
-#include <params.hpp>
-#include <paramdef/SP_EFFECT_PARAM_ST.hpp>
+#include <chrono>
+#include <exception>
+#include <filesystem>
 #include <format>
 #include <iostream>
-#include <toml++/toml.hpp>
+#include <ostream>
+#include <paramdef/SP_EFFECT_PARAM_ST.hpp>
+#include <params.hpp>
 #include <thread>
-#include <filesystem>
+
+#define TOML_EXCEPTIONS 0
+#include <toml++/toml.hpp>
+
 
 std::filesystem::path get_folder(HINSTANCE dll_instance) {
   wchar_t dll_filename[MAX_PATH] = {0};
@@ -16,6 +21,7 @@ std::filesystem::path get_folder(HINSTANCE dll_instance) {
 }
 
 void start(HINSTANCE dll_instance) {
+  std::this_thread::sleep_for(std::chrono::seconds(2));
   auto folder = get_folder(dll_instance);
 
   auto result = toml::parse_file((folder / "better_ng_plus.toml").c_str());
@@ -34,12 +40,13 @@ void start(HINSTANCE dll_instance) {
     log = &*maybe_ofstream;
   }
 
-
+  modutils::initialize();
   from::params::initialize();
 
   const auto base_id = 7000;
   const auto target_id = scaling_base_game * 10 + base_id;
-  auto params = from::params::get_param<from::paramdef::SP_EFFECT_PARAM_ST>(L"SpEffectParam");
+  auto params = from::params::get_param<from::paramdef::SP_EFFECT_PARAM_ST>(
+      L"SpEffectParam");
   auto base_scaling = params[target_id];
   auto base_ngplus_scaling = params[target_id + 400];
 
@@ -83,7 +90,13 @@ void start(HINSTANCE dll_instance) {
 // DllMain - will be used as the test dll's entry point
 BOOL DllMain(HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved) {
   if (fdwReason == DLL_PROCESS_ATTACH) {
-    std::thread{[=]() { start(hinstDll); }}.detach();
+    std::thread{[=]() {
+      try {
+        start(hinstDll);
+      } catch (std::exception e) {
+        MessageBox(0, e.what(), "error", 0);
+      }
+    }}.detach();
   }
   return TRUE;
 }
